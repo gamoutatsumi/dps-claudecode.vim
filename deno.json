@@ -1,0 +1,60 @@
+{
+  "tasks": {
+    "dev": "deno run --allow-all --watch denops/claudecode/app.ts",
+    "test": "deno test --allow-all test/",
+    "check": "deno check denops/claudecode/app.ts",
+    "fmt": "deno fmt",
+    "lint": "deno lint",
+    "cache": "deno cache --reload denops/claudecode/app.ts"
+  },
+  "imports": {
+    "@denops/core": "https://deno.land/x/denops_core@v7.0.0/mod.ts",
+    "@denops/std": "https://deno.land/x/denops_std@v7.0.0/mod.ts",
+    "@std/path": "https://deno.land/std@0.224.0/path/mod.ts",
+    "@std/fs": "https://deno.land/std@0.224.0/fs/mod.ts",
+    "@std/async": "https://deno.land/std@0.224.0/async/mod.ts",
+    "@std/uuid": "https://deno.land/std@0.224.0/uuid/mod.ts",
+    "@std/log": "https://deno.land/std@0.224.0/log/mod.ts",
+    "@anthropic-ai/claude-code": "npm:@anthropic-ai/claude-code@latest"
+  },
+  "compilerOptions": {
+    "strict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "exactOptionalPropertyTypes": false,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "useUnknownInCatchVariables": true,
+    "noUncheckedIndexedAccess": true,
+    "lib": [
+      "ES2022",
+      "DOM",
+      "WebWorker"
+    ]
+  },
+  "lint": {
+    "rules": {
+      "tags": [
+        "recommended"
+      ]
+    }
+  },
+  "fmt": {
+    "useTabs": false,
+    "lineWidth": 80,
+    "indentWidth": 2,
+    "semiColons": true,
+    "singleQuote": false,
+    "proseWrap": "preserve"
+  },
+  "test": {
+    "include": [
+      "test/**/*.ts"
+    ]
+  },
+  "exclude": [
+    "*.md",
+    "*.txt",
+    "doc/**/*"
+  ]
+}

@@ -1,0 +1,160 @@
+*claudecode.txt*	Claude Code integration for Vim/Neovim via denops.vim
+
+Author: Tatsumi GAMOU
+License: MIT
+
+==============================================================================
+CONTENTS					*claudecode-contents*
+
+1. Introduction					|claudecode-introduction|
+2. Requirements					|claudecode-requirements|
+3. Installation					|claudecode-installation|
+4. Commands					|claudecode-commands|
+5. Configuration				|claudecode-configuration|
+6. Functions					|claudecode-functions|
+7. Troubleshooting				|claudecode-troubleshooting|
+
+==============================================================================
+1. Introduction					*claudecode-introduction*
+
+dps-claudecode.vim is a plugin that integrates Claude Code with Vim and
+Neovim using the denops.vim framework. It provides an interactive prompt
+buffer and WebSocket communication to interact with Claude Code directly
+from within your editor.
+
+Features:
+- Claude Code SDK integration using @anthropic-ai/claude-code npm package
+- Asynchronous processing via denops.vim
+- Interactive prompt buffer for natural conversations
+- MCP (Model Context Protocol) support for IDE integration
+- Cross-platform support for both Vim and Neovim
+
+==============================================================================
+2. Requirements					*claudecode-requirements*
+
+- Vim 8.2+ or Neovim 0.6+
+- Deno 1.40+
+- denops.vim plugin
+- Claude Code CLI
+
+==============================================================================
+3. Installation					*claudecode-installation*
+
+Using vim-plug:
+>
+    Plug 'vim-denops/denops.vim'
+    Plug 'gamoutatsumi/dps-claudecode.vim'
+<
+
+Using dein.vim:
+>
+    call dein#add('vim-denops/denops.vim')
+    call dein#add('gamoutatsumi/dps-claudecode.vim')
+<
+
+Using Lazy.nvim:
+>
+    {
+      'gamoutatsumi/dps-claudecode.vim',
+      dependencies = { 'vim-denops/denops.vim' },
+    }
+<
+
+==============================================================================
+4. Commands					*claudecode-commands*
+
+:ClaudeCodeStart				*:ClaudeCodeStart*
+		Start the Claude Code WebSocket server and begin integration.
+
+:ClaudeCodeStop					*:ClaudeCodeStop*
+		Stop the Claude Code WebSocket server.
+
+:ClaudeCodePrompt				*:ClaudeCodePrompt*
+		Open an interactive prompt buffer for conversing with Claude Code.
+
+:ClaudeCodeStatus				*:ClaudeCodeStatus*
+		Display the current status of the Claude Code integration.
+
+:ClaudeCodeRestart				*:ClaudeCodeRestart*
+		Restart the Claude Code WebSocket server.
+
+==============================================================================
+5. Configuration				*claudecode-configuration*
+
+g:claudecode_config				*g:claudecode_config*
+		Dictionary containing configuration options for the plugin.
+
+		Default configuration:
+>
+		let g:claudecode_config = {
+		  \ 'port_range': {'min': 10000, 'max': 65535},
+		  \ 'auto_start': v:true,
+		  \ 'log_level': 'info',
+		  \ 'auth_required': v:true,
+		  \ 'prompt_buffer': {
+		  \   'split_direction': 'vertical',
+		  \   'size': 80,
+		  \ }
+		  \ }
+<
+
+		Configuration options:
+
+		port_range			*claudecode-config-port_range*
+			Dictionary specifying the range of ports to use for the
+			WebSocket server.
+			- min: Minimum port number (default: 10000)
+			- max: Maximum port number (default: 65535)
+
+		auto_start			*claudecode-config-auto_start*
+			Boolean value. If true, automatically start the Claude Code
+			server when Vim starts (default: true).
+
+		log_level			*claudecode-config-log_level*
+			String specifying the log level. Options: 'debug', 'info',
+			'warn', 'error' (default: 'info').
+
+		auth_required			*claudecode-config-auth_required*
+			Boolean value. If true, require authentication for WebSocket
+			connections (default: true).
+
+		prompt_buffer			*claudecode-config-prompt_buffer*
+			Dictionary containing prompt buffer configuration:
+			- split_direction: 'vertical' or 'horizontal' (default: 'vertical')
+			- size: Size of the prompt buffer in columns/lines (default: 80)
+
+==============================================================================
+6. Functions					*claudecode-functions*
+
+claudecode#start()				*claudecode#start()*
+		Start the Claude Code WebSocket server.
+
+claudecode#stop()				*claudecode#stop()*
+		Stop the Claude Code WebSocket server.
+
+claudecode#status()				*claudecode#status()*
+		Return the current status of the Claude Code integration.
+
+claudecode#open_prompt()			*claudecode#open_prompt()*
+		Open an interactive prompt buffer.
+
+==============================================================================
+7. Troubleshooting				*claudecode-troubleshooting*
+
+Q: The plugin doesn't start automatically.
+A: Check that g:claudecode_config.auto_start is set to v:true and that
+   denops.vim is properly installed and functioning.
+
+Q: WebSocket connection fails.
+A: Ensure that the Claude Code CLI is installed and accessible in your PATH.
+   Check that the configured port range is available.
+
+Q: Prompt buffer doesn't open.
+A: Verify that the Claude Code server is running with :ClaudeCodeStatus.
+   Try restarting with :ClaudeCodeRestart.
+
+For more help, visit:
+https://github.com/gamoutatsumi/dps-claudecode.vim
+
+==============================================================================
+vim:tw=78:ts=8:noet:ft=help:norl:
