@@ -148,6 +148,12 @@
                 src = ./.;
                 hooks = {
                   # keep-sorted start block=yes
+                  actionlint = {
+                    enable = true;
+                  };
+                  denolint = {
+                    enable = true;
+                  };
                   flake-checker = {
                     enable = true;
                     package = inputs'.flake-checker.packages.flake-checker;
@@ -171,13 +177,22 @@
                 deadnix = {
                   enable = true;
                 };
+                deno = {
+                  enable = true;
+                };
                 keep-sorted = {
+                  enable = true;
+                };
+                mdformat = {
                   enable = true;
                 };
                 nixfmt = {
                   enable = true;
                 };
                 statix = {
+                  enable = true;
+                };
+                yamlfmt = {
                   enable = true;
                 };
                 # keep-sorted end
