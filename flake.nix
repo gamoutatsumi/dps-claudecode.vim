@@ -95,12 +95,14 @@
                 context7 = {
                   enable = true;
                 };
-              };
-              settings = {
-                servers = {
-                  github-server = {
-                    type = "http";
-                    url = "https://api.githubcopilot.com/mcp";
+                github = {
+                  enable = true;
+                  passwordCommand = {
+                    GITHUB_PERSONAL_ACCESS_TOKEN = [
+                      (lib.getExe pkgs.gh)
+                      "auth"
+                      "token"
+                    ];
                   };
                 };
               };
