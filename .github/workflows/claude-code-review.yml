@@ -1,5 +1,4 @@
 name: Claude Code Review
-
 on:
   pull_request:
     types: [opened, synchronize]
@@ -9,7 +8,6 @@ on:
     #   - "src/**/*.tsx"
     #   - "src/**/*.js"
     #   - "src/**/*.jsx"
-
 jobs:
   claude-review:
     # Optional: Filter by PR author
@@ -17,30 +15,36 @@ jobs:
     #   github.event.pull_request.user.login == 'external-contributor' ||
     #   github.event.pull_request.user.login == 'new-developer' ||
     #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
-    
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: read
       issues: read
       id-token: write
-    
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 1
-
+      - uses: cachix/install-nix-action@f0fe604f8a612776892427721526b4c7cfb23aba # v31.4.1
+      - uses: nicknovitski/nix-develop@9be7cfb4b10451d3390a75dc18ad0465bed4932a # v1.2.1
+        with:
+          arguments: --accept-flake-config
       - name: Run Claude Code Review
         id: claude-review
-        uses: anthropics/claude-code-action@beta
+        uses: anthropics/claude-code-action@a9d9ad3612d6d61922fb1af719a32b9f1366f3f2 # v0.0.33
         with:
+          model: "claude-opus-4-0"
+          fallback_model: "claude-sonnet-4-0"
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-
-          # Optional: Specify model (defaults to Claude Sonnet 4, uncomment for Claude Opus 4)
-          # model: "claude-opus-4-20250514"
-          
-          # Direct prompt for automated review (no @claude mention needed)
+          additional_permissions: |
+            actions: read
+          allowed_tools: |
+            mcp__git__*
+            Bash(git push)
+            Bash(rm -rf)
+            Bash(rm)
+            mcp__sequential-thinking__sequentialthinking
           direct_prompt: |
             Please review this pull request and provide feedback on:
             - Code quality and best practices
@@ -48,31 +52,32 @@ jobs:
             - Performance considerations
             - Security concerns
             - Test coverage
-            
+
             Be constructive and helpful in your feedback.
+            You should use the `mcp__sequential-thinking__sequentialthinking` to analyze the code and provide a detailed review.
+            Please write reviews in Japanese.
 
-          # Optional: Use sticky comments to make Claude reuse the same comment on subsequent pushes to the same PR
-          # use_sticky_comment: true
-          
-          # Optional: Customize review based on file types
-          # direct_prompt: |
-          #   Review this PR focusing on:
-          #   - For TypeScript files: Type safety and proper interface usage
-          #   - For API endpoints: Security, input validation, and error handling
-          #   - For React components: Performance, accessibility, and best practices
-          #   - For tests: Coverage, edge cases, and test quality
-          
-          # Optional: Different prompts for different authors
-          # direct_prompt: |
-          #   ${{ github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR' && 
-          #   'Welcome! Please review this PR from a first-time contributor. Be encouraging and provide detailed explanations for any suggestions.' ||
-          #   'Please provide a thorough code review focusing on our coding standards and best practices.' }}
-          
-          # Optional: Add specific tools for running tests or linting
-          # allowed_tools: "Bash(npm run test),Bash(npm run lint),Bash(npm run typecheck)"
-          
-          # Optional: Skip review for certain conditions
-          # if: |
-          #   !contains(github.event.pull_request.title, '[skip-review]') &&
-          #   !contains(github.event.pull_request.title, '[WIP]')
+# Optional: Use sticky comments to make Claude reuse the same comment on subsequent pushes to the same PR
+# use_sticky_comment: true
 
+# Optional: Customize review based on file types
+# direct_prompt: |
+#   Review this PR focusing on:
+#   - For TypeScript files: Type safety and proper interface usage
+#   - For API endpoints: Security, input validation, and error handling
+#   - For React components: Performance, accessibility, and best practices
+#   - For tests: Coverage, edge cases, and test quality
+
+# Optional: Different prompts for different authors
+# direct_prompt: |
+#   ${{ github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR' &&
+#   'Welcome! Please review this PR from a first-time contributor. Be encouraging and provide detailed explanations for any suggestions.' ||
+#   'Please provide a thorough code review focusing on our coding standards and best practices.' }}
+
+# Optional: Add specific tools for running tests or linting
+# allowed_tools: "Bash(npm run test),Bash(npm run lint),Bash(npm run typecheck)"
+
+# Optional: Skip review for certain conditions
+# if: |
+#   !contains(github.event.pull_request.title, '[skip-review]') &&
+#   !contains(github.event.pull_request.title, '[WIP]')
