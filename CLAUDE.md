@@ -38,7 +38,8 @@ IDE 連携の仕組みを Denops で実装します。
 
 - Claude Code SDK
   - Claude Code との通信に使う
-  - `@anthropic-ai/claude-code` npm パッケージを利用
+  - `@anthropic-ai/claude-code` npm パッケージを利用し、Deno の npm import
+    機能を使って Denops から SDK を直接利用する
 - denops.vim
   - Vim 内でTypeScriptを使うためのフレームワークプラグイン
   - https://github.com/vim-denops/denops.vim
