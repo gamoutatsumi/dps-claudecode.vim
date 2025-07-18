@@ -12,7 +12,8 @@ Codeを統合するVim/Neovimプラグインです。現在は初期開発段階
 
 - **開発環境に入る**: `nix develop` または `direnv allow`
   (`.envrc`が存在する場合)
-- **コードフォーマット**: `nix fmt` または `treefmt`
+- **コードフォーマット**: `nix fmt` または `treefmt` (pre-commit hooks
+  で自動チェックされるので手動での実行は不要)
 - **TypeScript/Denoコードの lint**: git commitの際に pre-commit hooks で自動実行
 - **すべてのチェックを手動実行**: `nix flake check`
 
