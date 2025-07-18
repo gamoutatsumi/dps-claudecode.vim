@@ -45,6 +45,8 @@ jobs:
             actions: read
           allowed_tools: |
             mcp__git__*
+            mcp__context7__*
+            mcp__github__*
             Bash(git push)
             Bash(rm -rf)
             Bash(rm)
