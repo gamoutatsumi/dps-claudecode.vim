@@ -1,5 +1,5 @@
 {
-  description = "Default Flake";
+  description = "Claude Code and Vim/Neovim integration plugin powered denops.vim";
 
   inputs = {
     # keep-sorted start block=yes
