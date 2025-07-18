@@ -1,0 +1,5 @@
+.pre-commit-config.yaml
+.direnv
+
+.mcp.json
+.claude/settings.local.json
