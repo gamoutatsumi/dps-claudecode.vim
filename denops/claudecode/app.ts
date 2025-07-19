@@ -203,6 +203,9 @@ export function main(denops: Denops): void {
       if (!session) {
         throw new Error(`Session ${id} not found`);
       }
+      if (!session.active) {
+        throw new Error(`Session ${id} is inactive`);
+      }
 
       session.model = modelName;
       await denops.call(
