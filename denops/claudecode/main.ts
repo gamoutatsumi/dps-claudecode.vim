@@ -1,7 +1,37 @@
 import type { Denops, Entrypoint } from "jsr:@denops/std@^7.6.0";
 import { ensure, is } from "jsr:@core/unknownutil@^4.3.0";
 import { query } from "npm:@anthropic-ai/claude-code@^1.0.56";
-import { Session, StreamMessage } from "./types.ts";
+import { Session } from "./types.ts";
+
+// Type guard for StreamMessage
+const isStreamMessage = is.ObjectOf({
+  type: is.String,
+  message: is.Optional(is.ObjectOf({
+    id: is.String,
+    content: is.ArrayOf(is.ObjectOf({
+      type: is.String,
+      text: is.String,
+    })),
+  })),
+  usage: is.Optional(is.ObjectOf({
+    input_tokens: is.Number,
+    output_tokens: is.Number,
+  })),
+});
+
+// Function to sanitize error messages
+function sanitizeErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message.replace(
+      /api[_-]?key|token|secret|auth|bearer/gi,
+      "[REDACTED]",
+    );
+  }
+  return String(error).replace(
+    /api[_-]?key|token|secret|auth|bearer/gi,
+    "[REDACTED]",
+  );
+}
 
 const FLUSH_INTERVAL = 100; // Flush every 100ms
 
@@ -116,7 +146,7 @@ export const main: Entrypoint = (denops) => {
             },
           })
         ) {
-          const message = rawMessage as StreamMessage;
+          const message = ensure(rawMessage, isStreamMessage);
           // Handle different message types based on stream.json format
           if (message.type === "assistant") {
             if (!hasStartedResponse) {
@@ -217,7 +247,7 @@ export const main: Entrypoint = (denops) => {
         await denops.call(
           "claudecode#buffer#append_line",
           session.bufnr,
-          `Error: ${error instanceof Error ? error.message : String(error)}`,
+          `Error: ${sanitizeErrorMessage(error)}`,
         );
         await denops.call("claudecode#buffer#append_line", session.bufnr, "");
       }
