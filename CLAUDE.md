@@ -17,6 +17,7 @@ Code SDKを使用した対話的なセッションが利用可能です。
   で自動チェックされるので手動での実行は不要)
 - **TypeScript/Denoコードの lint**: git commitの際に pre-commit hooks で自動実行
 - **すべてのチェックを手動実行**: `nix flake check`
+- **Denoの依存関係のアップデート**: `deno task molt`
 
 ## アーキテクチャ
 
@@ -119,6 +120,31 @@ IDE 連携の仕組みを Denops で実装します。
 - 変更のコミットはリファクタリング、機能追加、テスト追加の3つの粒度で分けること
 - PLAN.md のロードマップに沿った変更を行う時は、変更点を PLAN.md に反映すること
 - 実装予定のものも含め、設計ドキュメントは ARCHITECTURE.md に記述すること
+
+### 型安全性の確保
+
+- unknown型の処理には`unknownutil`を使用すること
+  - パッケージは直接URLインポート（`jsr:@core/unknownutil@<version>`）を使用
+  - `deno.json`での依存管理は使用しない
+- 型アサーション（`as`）の代わりに`ensure`関数を使用すること
+- オブジェクト型の検証には事前に名前付き述語を定義すること
+  ```typescript
+  // Good
+  const isSessionInfo = is.ObjectOf({
+    model: is.String,
+    bufnr: is.Number,
+    active: is.Boolean,
+  });
+  const sessionInfo = ensure(data, isSessionInfo);
+
+  // Bad
+  const sessionInfo = data as { model: string; bufnr: number; active: boolean };
+  ```
+- 複合型（Union型など）にも分かりやすい名前を付けること
+  ```typescript
+  const isSessionInfoOrNull = is.UnionOf([isSessionInfo, is.Null]);
+  const isTextOrTextArray = is.UnionOf([is.String, is.ArrayOf(is.String)]);
+  ```
 
 ## 実装済み機能
 

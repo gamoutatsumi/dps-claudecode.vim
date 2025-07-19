@@ -1,8 +1,15 @@
 {
   "lock": false,
   "tasks": {
-    "lint": "deno lint && deno check ./**/*.ts",
-    "molt": "deno run --allow-env --allow-read --allow-write --allow-run=git,deno --allow-net jsr:@molt/cli ./**/*.ts --write"
+    "lint": "deno lint && deno check denops/**/*.ts test/**/*.ts",
+    "molt": "deno run --allow-env --allow-read --allow-write --allow-run=git,deno --allow-net jsr:@molt/cli ./[^.direnv]*/**/*.ts --write",
+    "test": "deno test --allow-all --unstable test/",
+    "test:unit": "deno test --allow-all test/unit/",
+    "test:integration": "deno test --allow-all test/integration/",
+    "test:e2e": "deno test --allow-all test/e2e/",
+    "test:coverage": "deno test --allow-all --coverage=coverage test/",
+    "test:watch": "deno test --allow-all --watch test/",
+    "bench": "deno bench --allow-all test/performance/"
   },
   "fmt": {
     "exclude": [
@@ -13,7 +20,8 @@
   "lint": {
     "exclude": [
       ".deno",
-      ".git"
+      ".git",
+      ".direnv"
     ]
   }
 }

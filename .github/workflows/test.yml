@@ -1,0 +1,101 @@
+name: Test
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths:
+      - "**.md"
+      - "**.ts"
+      - "**.vim"
+      - "deno.json"
+      - ".github/workflows/test.yml"
+  workflow_dispatch:
+    inputs:
+      denops_branch:
+        description: "Denops branch to test"
+        required: false
+        default: "main"
+# Use 'bash' as default shell even on Windows
+defaults:
+  run:
+    shell: bash --noprofile --norc -eo pipefail {0}
+env:
+  DENOPS_BRANCH: ${{ github.event.inputs.denops_branch || 'main' }}
+jobs:
+  test:
+    strategy:
+      matrix:
+        runner:
+          - windows-latest
+          - macos-latest
+          - ubuntu-latest
+        deno_version:
+          - "1.45.0"
+          - "1.x"
+        host_version:
+          - vim: "v9.1.0448"
+            nvim: "v0.10.0"
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - run: git config --global core.autocrlf false
+        if: runner.os == 'Windows'
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: denoland/setup-deno@11b63cf76cfcafb4e43f97b6cad24d8e8438f62d # v1.5.2
+        with:
+          deno-version: ${{ matrix.deno_version }}
+      - name: Get denops
+        run: |
+          git clone https://github.com/vim-denops/denops.vim /tmp/denops.vim
+          echo "DENOPS_TEST_DENOPS_PATH=/tmp/denops.vim" >> "$GITHUB_ENV"
+      - name: Try switching denops branch
+        run: |
+          git -C /tmp/denops.vim switch ${{ env.DENOPS_BRANCH }} || true
+          git -C /tmp/denops.vim branch
+      - uses: rhysd/action-setup-vim@8e931b9954b19d4203d5caa5ff5521f3bc21dcc7 # v1.4.2
+        id: vim
+        with:
+          version: ${{ matrix.host_version.vim }}
+      - uses: rhysd/action-setup-vim@8e931b9954b19d4203d5caa5ff5521f3bc21dcc7 # v1.4.2
+        id: nvim
+        with:
+          neovim: true
+          version: ${{ matrix.host_version.nvim }}
+      - name: Export executables
+        run: |
+          echo "DENOPS_TEST_VIM_EXECUTABLE=${{ steps.vim.outputs.executable }}" >> "$GITHUB_ENV"
+          echo "DENOPS_TEST_NVIM_EXECUTABLE=${{ steps.nvim.outputs.executable }}" >> "$GITHUB_ENV"
+      - name: Check versions
+        run: |
+          deno --version
+          ${DENOPS_TEST_VIM_EXECUTABLE} --version
+          ${DENOPS_TEST_NVIM_EXECUTABLE} --version
+      - name: Perform pre-cache
+        run: |
+          deno cache "${DENOPS_TEST_DENOPS_PATH}/denops/@denops-private/mod.ts"
+          deno cache ./denops/claudecode/app.ts
+      - name: Run unit tests
+        run: deno task test:unit
+      - name: Run integration tests
+        run: deno task test:integration
+      - name: Generate coverage report
+        run: deno task test:coverage
+        if: matrix.runner == 'ubuntu-latest' && matrix.deno_version == '1.x'
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@ab904c41d6ece82784817410c45d8b8c02684457 # v3.1.6
+        if: matrix.runner == 'ubuntu-latest' && matrix.deno_version == '1.x'
+        with:
+          directory: ./coverage
+          flags: unittests
+          name: codecov-umbrella
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: denoland/setup-deno@11b63cf76cfcafb4e43f97b6cad24d8e8438f62d # v1.5.2
+        with:
+          deno-version: "1.x"
+      - name: Run linter
+        run: deno task lint
+      - name: Check formatting
+        run: deno fmt --check

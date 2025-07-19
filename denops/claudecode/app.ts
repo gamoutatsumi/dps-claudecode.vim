@@ -1,6 +1,6 @@
 import { Denops } from "jsr:@denops/std@^7.0.0";
-import { ensure, is } from "jsr:@core/unknownutil@^4.0.0";
-import { query } from "npm:@anthropic-ai/claude-code@1.0.51";
+import { ensure, is } from "jsr:@core/unknownutil@^4.3.0";
+import { query } from "npm:@anthropic-ai/claude-code@^1.0.56";
 
 // Define types based on stream.json format
 interface TextContent {
