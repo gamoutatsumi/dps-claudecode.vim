@@ -341,7 +341,7 @@ export class PromptBuffer {
 
     // プロンプトコールバックの設定
     await denops.cmd(`
-      call prompt_setcallback(${this.bufnr}, 
+      call prompt_setcallback(${this.bufnr},
         function('denops#request', ['claudecode', 'onPromptInput']))
     `);
   }
@@ -392,35 +392,420 @@ export class SelectionTracker {
 }
 ```
 
-### フェーズ5: 統合とテスト（1週間）
+### フェーズ5: テスト戦略と実装（2週間）
 
-#### 5.1 E2Eテスト
+#### 5.0 テストフレームワーク
+
+このプロジェクトでは、[deno-denops-test](https://github.com/vim-denops/deno-denops-test)
+を使用してテストを実装します。これはdenopsプラグイン専用に設計されたテストフレームワークで、以下の機能を提供します：
+
+- **実際のVim/Neovimプロセスでのテスト**: `test()` 関数を使用
+- **モックテスト**: `DenopsStub` クラスを使用
+- **複数のテストモード**: vim, nvim, all, any
+
+##### 環境設定
+
+テストを実行するには、以下の環境変数が必要です：
+
+```bash
+# 必須: denops.vimのパスを設定
+export DENOPS_TEST_DENOPS_PATH=/path/to/denops.vim
+
+# オプション: Vim/Neovimの実行ファイルパス
+export DENOPS_TEST_VIM_EXECUTABLE=vim
+export DENOPS_TEST_NVIM_EXECUTABLE=nvim
+
+# オプション: デバッグ出力を有効化
+export DENOPS_TEST_VERBOSE=1
+```
+
+#### 5.1 テストアーキテクチャ
+
+```
+test/
+├── unit/                    # ユニットテスト
+│   ├── sdk_test.ts         # Claude Code SDK統合のテスト
+│   ├── session_test.ts     # セッション管理のテスト
+│   └── state_test.ts       # 状態管理のテスト
+├── integration/            # 統合テスト
+│   ├── denops_test.ts     # Denops通信のテスト
+│   └── buffer_test.ts     # バッファ操作のテスト
+├── e2e/                    # E2Eテスト
+│   └── commands_test.ts   # Vimコマンドのテスト
+├── mocks/                  # モックデータ
+│   ├── claude_sdk.ts      # Claude Code SDKのモック
+│   └── responses.ts       # サンプルレスポンス
+└── fixtures/              # テストフィクスチャ
+    └── test_project/      # テスト用プロジェクト
+```
+
+#### 5.2 ユニットテスト
+
+##### 5.2.1 セッション管理テスト
 
 ```typescript
-// test/e2e/integration_test.ts
-Deno.test("Claude Code integration", async () => {
-  const denops = await getTestDenops();
+// test/unit/session_test.ts
+import { assertEquals, assertExists } from "jsr:@std/assert";
+import { beforeEach, describe, it } from "jsr:@std/testing/bdd";
+import { currentSessionId, sessions } from "../../denops/claudecode/app.ts";
 
-  // WebSocketサーバーの起動
-  await denops.dispatch("claudecode", "start", []);
-
-  // Claude Code CLIの起動をシミュレート
-  const client = await connectWebSocket();
-
-  // ツール呼び出しのテスト
-  const response = await client.call("openFile", {
-    filePath: "/test/file.ts",
+describe("Session Management", () => {
+  beforeEach(() => {
+    sessions.clear();
+    currentSessionId = null;
   });
 
-  assertEquals(response.content[0].text, "Opened file: /test/file.ts");
+  it("should create a new session", () => {
+    const sessionId = createSession(1234, "sonnet");
+    assertExists(sessions.get(sessionId));
+    assertEquals(currentSessionId, sessionId);
+  });
+
+  it("should handle multiple sessions", () => {
+    const session1 = createSession(1234, "sonnet");
+    const session2 = createSession(5678, "opus");
+
+    assertEquals(sessions.size, 2);
+    assertEquals(currentSessionId, session2);
+  });
+
+  it("should clean up ended sessions", () => {
+    const sessionId = createSession(1234, "sonnet");
+    endSession(sessionId);
+
+    assertEquals(sessions.has(sessionId), false);
+    assertEquals(currentSessionId, null);
+  });
 });
 ```
 
-#### 5.2 パフォーマンステスト
+##### 5.2.2 Claude Code SDKモックテスト
 
-- 大規模ファイルでの応答時間測定
-- 並行接続時の安定性確認
-- メモリ使用量の監視
+```typescript
+// test/unit/sdk_test.ts
+import { assertEquals } from "jsr:@std/assert";
+import { describe, it } from "jsr:@std/testing/bdd";
+import { createMockQuery } from "../mocks/claude_sdk.ts";
+
+describe("Claude Code SDK Integration", () => {
+  it("should handle streaming responses", async () => {
+    const mockQuery = createMockQuery([
+      { type: "system", message: "Starting..." },
+      {
+        type: "assistant",
+        message: { content: [{ type: "text", text: "Hello" }] },
+      },
+      { type: "result", usage: { input_tokens: 10, output_tokens: 5 } },
+    ]);
+
+    const messages = [];
+    for await (const msg of mockQuery("Test prompt")) {
+      messages.push(msg);
+    }
+
+    assertEquals(messages.length, 3);
+    assertEquals(messages[1].message.content[0].text, "Hello");
+  });
+
+  it("should handle errors gracefully", async () => {
+    const mockQuery = createMockQuery(new Error("API Error"));
+
+    try {
+      for await (const _ of mockQuery("Test prompt")) {
+        // Should throw
+      }
+    } catch (error) {
+      assertEquals(error.message, "API Error");
+    }
+  });
+});
+```
+
+#### 5.3 統合テスト
+
+##### 5.3.1 Denops通信テスト（deno-denops-test使用）
+
+```typescript
+// test/integration/denops_test.ts
+import { test } from "jsr:@denops/test@^6.0.0";
+import { assertEquals, assertExists } from "jsr:@std/assert@^1.0.0";
+
+test({
+  mode: "all",
+  name: "Denops dispatcher functions",
+  fn: async (denops) => {
+    // セッション開始テスト
+    const sessionId = await denops.dispatch("claudecode", "startSession", [
+      1,
+      "sonnet",
+    ]);
+    assertEquals(typeof sessionId, "string");
+
+    // セッション情報取得テスト
+    const info = await denops.dispatch("claudecode", "getSessionInfo", [
+      sessionId,
+    ]);
+    assertEquals(info.model, "sonnet");
+    assertEquals(info.bufnr, 1);
+
+    // セッション終了テスト
+    await denops.dispatch("claudecode", "endSession", [sessionId]);
+    const endedInfo = await denops.dispatch("claudecode", "getSessionInfo", [
+      sessionId,
+    ]);
+    assertEquals(endedInfo, null);
+  },
+});
+
+// Vim専用テスト
+test({
+  mode: "vim",
+  name: "Vim-specific buffer operations",
+  fn: async (denops) => {
+    const sessionId = await denops.dispatch("claudecode", "startSession", [
+      1,
+      "sonnet",
+    ]);
+    const bufname = await denops.call("bufname", 1);
+    assertEquals(typeof bufname, "string");
+    await denops.dispatch("claudecode", "endSession", [sessionId]);
+  },
+});
+
+// Neovim専用テスト
+test({
+  mode: "nvim",
+  name: "Neovim-specific features",
+  fn: async (denops) => {
+    const hasNvim = await denops.call("has", "nvim");
+    assertEquals(hasNvim, 1);
+  },
+});
+```
+
+##### 5.3.2 DenopsStubを使用したモックテスト
+
+```typescript
+// test/unit/denops_stub_test.ts
+import { assertEquals } from "jsr:@std/assert@^1.0.0";
+import { DenopsStub } from "jsr:@denops/test@^6.0.0";
+
+Deno.test("Denops Plugin with Stub", async () => {
+  // カスタムディスパッチャー実装でスタブを作成
+  const denops = new DenopsStub({
+    name: "claudecode",
+    dispatcher: {
+      startSession: (bufnr: unknown, model?: unknown) => {
+        return Promise.resolve("test-session-id");
+      },
+      getSessionInfo: (sessionId: unknown) => {
+        if (sessionId === "test-session-id") {
+          return Promise.resolve({
+            id: "test-session-id",
+            model: "sonnet",
+            bufnr: 1,
+            messages: [],
+            active: true,
+          });
+        }
+        return Promise.resolve(null);
+      },
+    },
+  });
+
+  // ディスパッチャーメソッドのテスト
+  const sessionId = await denops.dispatch("claudecode", "startSession", [
+    1,
+    "sonnet",
+  ]);
+  assertEquals(sessionId, "test-session-id");
+
+  const info = await denops.dispatch("claudecode", "getSessionInfo", [
+    "test-session-id",
+  ]);
+  assertEquals(info?.model, "sonnet");
+});
+```
+
+##### 5.3.3 バッファ操作テスト
+
+```typescript
+// test/integration/buffer_test.ts
+import { test } from "jsr:@denops/test@^6.0.0";
+import { assertEquals } from "jsr:@std/assert@^1.0.0";
+
+test({
+  mode: "all",
+  name: "Buffer operations",
+  fn: async (denops) => {
+    // バッファ作成テスト
+    const bufnr = await denops.call("claudecode#buffer#create");
+    assertEquals(typeof bufnr, "number");
+
+    // バッファへの行追加テスト
+    await denops.call("claudecode#buffer#append_line", bufnr, "Test line");
+    const lines = await denops.call("getbufline", bufnr, 1, "$");
+    assertEquals(lines.includes("Test line"), true);
+
+    // 最終行の置換テスト
+    await denops.call(
+      "claudecode#buffer#replace_last_line",
+      bufnr,
+      "Replaced line",
+    );
+    const lastLine = await denops.call("getline", "$");
+    assertEquals(lastLine, "Replaced line");
+  },
+});
+```
+
+#### 5.4 E2Eテスト
+
+```typescript
+// test/e2e/commands_test.ts
+import { test } from "jsr:@denops/test@^6.0.0";
+import {
+  assertEquals,
+  assertExists,
+  assertMatch,
+} from "jsr:@std/assert@^1.0.0";
+
+test({
+  mode: "all",
+  name: "ClaudeCode commands",
+  fn: async (denops) => {
+    // ClaudeCodeStartコマンドテスト
+    await denops.cmd("ClaudeCodeStart sonnet");
+    const sessionId = await denops.dispatch(
+      "claudecode",
+      "getCurrentSession",
+      [],
+    );
+    assertExists(sessionId);
+
+    // バッファが作成されていることを確認
+    const bufname = await denops.call("bufname", "%");
+    assertMatch(bufname, /ClaudeCode-\d+/);
+
+    // ClaudeCodeEndコマンドテスト
+    await denops.cmd("ClaudeCodeEnd");
+    const endedSession = await denops.dispatch(
+      "claudecode",
+      "getCurrentSession",
+      [],
+    );
+    assertEquals(endedSession, null);
+  },
+});
+```
+
+#### 5.5 パフォーマンステスト
+
+```typescript
+// test/performance/benchmark_test.ts
+import { bench } from "jsr:@std/testing/bench";
+
+bench({
+  name: "Session creation performance",
+  runs: 1000,
+  func: () => {
+    const sessionId = crypto.randomUUID();
+    const session = {
+      id: sessionId,
+      model: "sonnet",
+      bufnr: 1,
+      messages: [],
+      active: true,
+    };
+    sessions.set(sessionId, session);
+  },
+});
+
+bench({
+  name: "Large message handling",
+  runs: 100,
+  func: async () => {
+    const largeText = "x".repeat(10000);
+    const messages = [];
+    for (let i = 0; i < 100; i++) {
+      messages.push({
+        content: [{ type: "text", text: largeText }],
+      });
+    }
+    // Process messages
+  },
+});
+```
+
+#### 5.6 テスト実行設定
+
+##### 5.6.1 deno.jsonへのテストタスク追加
+
+```json
+{
+  "tasks": {
+    "test": "deno test --allow-all --unstable test/",
+    "test:unit": "deno test --allow-all test/unit/",
+    "test:integration": "deno test --allow-all test/integration/",
+    "test:e2e": "deno test --allow-all test/e2e/",
+    "test:coverage": "deno test --allow-all --coverage=coverage test/",
+    "test:watch": "deno test --allow-all --watch test/",
+    "bench": "deno bench --allow-all test/performance/"
+  }
+}
+```
+
+##### 5.6.2 CI/CD設定（GitHub Actions）
+
+```yaml
+# .github/workflows/test.yml
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+      - name: Run unit tests
+        run: deno task test:unit
+      - name: Run integration tests
+        run: deno task test:integration
+      - name: Generate coverage
+        run: deno task test:coverage
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+```
+
+#### 5.7 テストのベストプラクティス
+
+1. **モックの活用**
+
+   - Claude Code SDKの呼び出しは必ずモック化
+   - 外部依存を最小化
+
+1. **テストの独立性**
+
+   - 各テストは他のテストに依存しない
+   - セットアップとクリーンアップを確実に実行
+
+1. **エラーケースのカバー**
+
+   - 正常系だけでなく異常系もテスト
+   - エッジケースを網羅的にテスト
+
+1. **パフォーマンスの監視**
+
+   - ベンチマークテストで性能劣化を検知
+   - メモリリークのチェック
 
 ## セキュリティ考慮事項
 
