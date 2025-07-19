@@ -239,11 +239,8 @@ export function main(denops: Denops): void {
       const modelName = ensure(model, is.String);
 
       const session = sessions.get(id);
-      if (!session) {
-        throw new Error(`Session ${id} not found`);
-      }
-      if (!session.active) {
-        throw new Error(`Session ${id} is inactive`);
+      if (!session || !session.active) {
+        throw new Error(`Session ${id} not found or inactive`);
       }
 
       session.model = modelName;
