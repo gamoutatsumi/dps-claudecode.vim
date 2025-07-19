@@ -79,6 +79,29 @@ claudecode.nvimの実装を参考に：
 1. **レスポンス処理** → ストリーミング/バッチ
 1. **UI更新** → バッファへの出力
 
+## 状態管理
+
+すべての状態はTypeScript側で一元管理されており、Vim
+Script側は必要に応じてTypeScriptに問い合わせを行います：
+
+### TypeScript側（app.ts）
+
+- `sessions: Map<string, Session>` - すべてのセッション情報
+- `currentSessionId: string | null` - 現在のアクティブセッションID
+
+### Vim Script側
+
+- 状態は保持せず、必要時にTypeScriptから取得
+- `denops#request()` で同期的に状態を問い合わせ
+- エラーハンドリングを適切に実装
+
+### 利点
+
+- Single Source of Truth（真実の単一情報源）の原則に従う
+- 状態の同期問題を回避
+- デバッグとメンテナンスが容易
+- プラグインのリロード時も一貫性を保持
+
 ## 非同期処理
 
 Denopsの非同期機能を活用：

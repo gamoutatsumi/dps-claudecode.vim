@@ -47,6 +47,7 @@ export type Session = {
 };
 
 const sessions = new Map<string, Session>();
+let currentSessionId: string | null = null;
 
 export function main(denops: Denops): void {
   denops.dispatcher = {
@@ -64,6 +65,7 @@ export function main(denops: Denops): void {
       };
 
       sessions.set(sessionId, session);
+      currentSessionId = sessionId;
       return sessionId;
     },
 
@@ -183,6 +185,11 @@ export function main(denops: Denops): void {
       if (session) {
         session.active = false;
         sessions.delete(id);
+
+        // Clear current session if it's the one being ended
+        if (currentSessionId === id) {
+          currentSessionId = null;
+        }
       }
     },
 
@@ -193,6 +200,38 @@ export function main(denops: Denops): void {
     getSessionInfo(sessionId: unknown): Session | null {
       const id = ensure(sessionId, is.String);
       return sessions.get(id) || null;
+    },
+
+    getCurrentSession(): string | null {
+      return currentSessionId;
+    },
+
+    setCurrentSession(sessionId: unknown): void {
+      const id = ensure(sessionId, is.String);
+
+      // Verify the session exists and is active
+      const session = sessions.get(id);
+      if (!session) {
+        throw new Error(`Session ${id} not found`);
+      }
+      if (!session.active) {
+        throw new Error(`Session ${id} is inactive`);
+      }
+
+      currentSessionId = id;
+    },
+
+    getSession(sessionId: unknown): Session | null {
+      const id = ensure(sessionId, is.String);
+      return sessions.get(id) || null;
+    },
+
+    getAllSessions(): Record<string, Session> {
+      const result: Record<string, Session> = {};
+      sessions.forEach((session, id) => {
+        result[id] = session;
+      });
+      return result;
     },
 
     async switchModel(sessionId: unknown, model: unknown): Promise<void> {

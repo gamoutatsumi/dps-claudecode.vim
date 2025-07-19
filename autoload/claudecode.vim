@@ -11,10 +11,6 @@ if !exists('g:loaded_denops')
   finish
 endif
 
-" Session management
-let s:sessions = {}
-let s:current_session = ''
-
 " Start a new Claude Code session
 function! claudecode#start(...) abort
   let model = a:0 > 0 ? a:1 : 'sonnet'
@@ -24,13 +20,6 @@ function! claudecode#start(...) abort
 
   " Start session via denops
   let session_id = denops#request('claudecode', 'startSession', [bufnr, model])
-
-  " Store session info
-  let s:sessions[session_id] = {
-        \ 'bufnr': bufnr,
-        \ 'model': model,
-        \ }
-  let s:current_session = session_id
 
   " Setup buffer
   call claudecode#buffer#setup(bufnr, session_id)
@@ -49,35 +38,34 @@ endfunction
 
 " Send a message to Claude
 function! claudecode#send_message(message) abort
-  if empty(s:current_session)
+  let current_session = denops#request('claudecode', 'getCurrentSession', [])
+  if empty(current_session)
     echoerr 'No active Claude Code session. Use :ClaudeCodeStart to begin.'
     return
   endif
 
-  let session = s:sessions[s:current_session]
+  let session_info = denops#request('claudecode', 'getSessionInfo', [current_session])
+  if empty(session_info)
+    echoerr 'Session not found'
+    return
+  endif
 
   " Append user message to buffer
-  call claudecode#buffer#append_line(session.bufnr, 'You: ' . a:message)
+  call claudecode#buffer#append_line(session_info.bufnr, 'You: ' . a:message)
 
   " Send message via denops
-  call denops#notify('claudecode', 'sendMessage', [s:current_session, a:message])
+  call denops#notify('claudecode', 'sendMessage', [current_session, a:message])
 endfunction
 
 " End the current session
 function! claudecode#end() abort
-  if empty(s:current_session)
+  let current_session = denops#request('claudecode', 'getCurrentSession', [])
+  if empty(current_session)
     echoerr 'No active Claude Code session'
     return
   endif
 
-  call denops#notify('claudecode', 'endSession', [s:current_session])
-
-  " Clean up
-  if has_key(s:sessions, s:current_session)
-    unlet s:sessions[s:current_session]
-  endif
-  let s:current_session = ''
-
+  call denops#notify('claudecode', 'endSession', [current_session])
   echo 'Claude Code session ended'
 endfunction
 
@@ -101,39 +89,42 @@ endfunction
 
 " Switch to a different session
 function! claudecode#switch_session(session_id) abort
-  if !has_key(s:sessions, a:session_id)
-    echoerr 'Invalid session ID: ' . a:session_id
-    return
-  endif
-
-  let s:current_session = a:session_id
-  let session = s:sessions[a:session_id]
-
-  " Switch to the session's buffer
-  execute 'buffer' session.bufnr
-
-  echo 'Switched to session: ' . a:session_id
+  try
+    call denops#request('claudecode', 'setCurrentSession', [a:session_id])
+    let session_info = denops#request('claudecode', 'getSessionInfo', [a:session_id])
+    
+    if !empty(session_info)
+      " Switch to the session's buffer
+      execute 'buffer' session_info.bufnr
+      echo 'Switched to session: ' . a:session_id
+    else
+      echoerr 'Session not found: ' . a:session_id
+    endif
+  catch
+    echoerr 'Error switching session: ' . v:exception
+  endtry
 endfunction
 
 " Switch model for current session
 function! claudecode#switch_model(model) abort
-  if empty(s:current_session)
+  let current_session = denops#request('claudecode', 'getCurrentSession', [])
+  if empty(current_session)
     echoerr 'No active Claude Code session'
     return
   endif
 
-  call denops#notify('claudecode', 'switchModel', [s:current_session, a:model])
-  let s:sessions[s:current_session].model = a:model
+  call denops#notify('claudecode', 'switchModel', [current_session, a:model])
 endfunction
 
 " Get current session info
 function! claudecode#get_current_session() abort
-  return s:current_session
+  return denops#request('claudecode', 'getCurrentSession', [])
 endfunction
 
 " Get session info
 function! claudecode#get_session_info(session_id) abort
-  return has_key(s:sessions, a:session_id) ? s:sessions[a:session_id] : {}
+  let info = denops#request('claudecode', 'getSessionInfo', [a:session_id])
+  return !empty(info) ? info : {}
 endfunction
 
 let &cpo = s:save_cpo
