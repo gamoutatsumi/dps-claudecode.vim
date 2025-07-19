@@ -341,7 +341,7 @@ export class PromptBuffer {
 
     // プロンプトコールバックの設定
     await denops.cmd(`
-      call prompt_setcallback(${this.bufnr}, 
+      call prompt_setcallback(${this.bufnr},
         function('denops#request', ['claudecode', 'onPromptInput']))
     `);
   }
