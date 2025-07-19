@@ -1,53 +1,9 @@
-import { Denops } from "jsr:@denops/std@^7.0.0";
+import type { Denops, Entrypoint } from "jsr:@denops/std@^7.6.0";
 import { ensure, is } from "jsr:@core/unknownutil@^4.3.0";
 import { query } from "npm:@anthropic-ai/claude-code@^1.0.56";
+import { Session, StreamMessage } from "./types.ts";
 
 const FLUSH_INTERVAL = 100; // Flush every 100ms
-
-// Define types based on stream.json format
-interface TextContent {
-  type: "text";
-  text: string;
-}
-
-interface AssistantMessage {
-  id: string;
-  type: "message";
-  role: "assistant";
-  model: string;
-  content: TextContent[];
-  stop_reason: string | null;
-  stop_sequence: string | null;
-  usage: {
-    input_tokens: number;
-    cache_creation_input_tokens?: number;
-    cache_read_input_tokens?: number;
-    output_tokens: number;
-    service_tier: string;
-  };
-}
-
-interface StreamMessage {
-  type: "system" | "assistant" | "result";
-  message?: AssistantMessage;
-  usage?: {
-    input_tokens: number;
-    output_tokens: number;
-    cache_creation_input_tokens?: number;
-    cache_read_input_tokens?: number;
-  };
-  // Other fields we don't need to track
-  [key: string]: unknown;
-}
-
-export type Session = {
-  id: string;
-  model: string;
-  bufnr: number;
-  messages: AssistantMessage[];
-  active: boolean;
-  lastActivity: number;
-};
 
 const sessions = new Map<string, Session>();
 let currentSessionId: string | null = null;
@@ -92,7 +48,7 @@ async function flushPendingLines(
   return null;
 }
 
-export function main(denops: Denops): void {
+export const main: Entrypoint = (denops) => {
   denops.dispatcher = {
     startSession(bufnr: unknown, model?: unknown): string {
       const bufferNumber = ensure(bufnr, is.Number);
@@ -347,4 +303,4 @@ export function main(denops: Denops): void {
       await denops.call("claudecode#buffer#append_line", session.bufnr, "");
     },
   };
-}
+};

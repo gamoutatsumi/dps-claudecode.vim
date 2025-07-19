@@ -1,4 +1,6 @@
-import { test } from "jsr:@denops/test@^3.0.4";
+import { runtimepath } from "jsr:@denops/std@^7.6.0/option";
+import * as path from "jsr:@std/path@1.0.0";
+import { test as testOri, type TestDefinition } from "jsr:@denops/test@^3.0.4";
 import { assertEquals, assertExists } from "jsr:@std/assert@^1.0.0";
 import { ensure, is } from "jsr:@core/unknownutil@^4.3.0";
 
@@ -11,90 +13,113 @@ const isSessionInfo = is.ObjectOf({
 
 const isSessionInfoOrNull = is.UnionOf([isSessionInfo, is.Null]);
 
-test({
-  mode: "all",
-  name: "Denops dispatcher functions",
-  fn: async (denops) => {
-    // Test session creation
-    const sessionId = await denops.dispatch("claudecode", "startSession", [
-      1,
-      "sonnet",
-    ]);
-    assertExists(sessionId);
-    assertEquals(typeof sessionId, "string");
+const runtimePath = path.resolve(
+  path.fromFileUrl(new URL("../..", import.meta.url)),
+);
 
-    // Test getting session info
-    const info = await denops.dispatch("claudecode", "getSessionInfo", [
-      sessionId,
-    ]);
-    const sessionInfo = ensure(info, isSessionInfoOrNull);
-    assertExists(sessionInfo);
-    assertEquals(sessionInfo.model, "sonnet");
-    assertEquals(sessionInfo.bufnr, 1);
-    assertEquals(sessionInfo.active, true);
+const test = (
+  mode: TestDefinition["mode"],
+  name: string,
+  fn: TestDefinition["fn"],
+) =>
+  testOri({
+    mode,
+    name,
+    fn,
+    pluginName: "claudecode",
+    prelude: [`set runtimepath^=${runtimePath}`],
+  });
 
-    // Test getting current session
-    const currentSession = await denops.dispatch(
-      "claudecode",
-      "getCurrentSession",
-      [],
-    );
-    assertEquals(currentSession, sessionId);
+test(
+  "all",
+  "Denops dispatcher functions",
+  async (denops, t) => {
+    await t.step({
+      name: "Session API",
+      fn: async () => {
+        console.log(await runtimepath.get(denops));
+        // Test session creation
+        const sessionId = await denops.dispatch(denops.name, "startSession", [
+          1,
+          "sonnet",
+        ]);
+        assertExists(sessionId);
+        assertEquals(typeof sessionId, "string");
 
-    // Test listing sessions
-    const sessionsResult = await denops.dispatch(
-      "claudecode",
-      "listSessions",
-      [],
-    );
-    const sessions = ensure(sessionsResult, is.ArrayOf(is.String));
-    assertEquals(Array.isArray(sessions), true);
-    assertEquals(sessions.includes(ensure(sessionId, is.String)), true);
+        // Test getting session info
+        const info = await denops.dispatch(denops.name, "getSessionInfo", [
+          sessionId,
+        ]);
+        const sessionInfo = ensure(info, isSessionInfoOrNull);
+        assertExists(sessionInfo);
+        assertEquals(sessionInfo.model, "sonnet");
+        assertEquals(sessionInfo.bufnr, 1);
+        assertEquals(sessionInfo.active, true);
 
-    // Test ending session
-    await denops.dispatch("claudecode", "endSession", [sessionId]);
+        // Test getting current session
+        const currentSession = await denops.dispatch(
+          denops.name,
+          "getCurrentSession",
+          [],
+        );
+        assertEquals(currentSession, sessionId);
 
-    // Verify session is ended
-    const endedInfo = await denops.dispatch("claudecode", "getSessionInfo", [
-      sessionId,
-    ]);
-    assertEquals(endedInfo, null);
+        // Test listing sessions
+        const sessionsResult = await denops.dispatch(
+          denops.name,
+          "listSessions",
+          [],
+        );
+        const sessions = ensure(sessionsResult, is.ArrayOf(is.String));
+        assertEquals(Array.isArray(sessions), true);
+        assertEquals(sessions.includes(ensure(sessionId, is.String)), true);
 
-    const endedCurrent = await denops.dispatch(
-      "claudecode",
-      "getCurrentSession",
-      [],
-    );
-    assertEquals(endedCurrent, null);
+        // Test ending session
+        await denops.dispatch(denops.name, "endSession", [sessionId]);
+
+        // Verify session is ended
+        const endedInfo = await denops.dispatch(denops.name, "getSessionInfo", [
+          sessionId,
+        ]);
+        assertEquals(endedInfo, null);
+
+        const endedCurrent = await denops.dispatch(
+          denops.name,
+          "getCurrentSession",
+          [],
+        );
+        assertEquals(endedCurrent, null);
+      },
+    });
   },
-});
+);
 
-test({
-  mode: "all",
-  name: "State management centralization",
-  fn: async (denops) => {
+test(
+  "all",
+  "State management centralization",
+  async (denops) => {
     // Create multiple sessions
-    const session1 = await denops.dispatch("claudecode", "startSession", [
+    const session1 = await denops.dispatch(denops.name, "startSession", [
       1,
       "sonnet",
     ]);
-    const session2 = await denops.dispatch("claudecode", "startSession", [
+    const session2 = await denops.dispatch(denops.name, "startSession", [
       2,
       "opus",
     ]);
 
     // Current session should be the last created one
-    let current = await denops.dispatch("claudecode", "getCurrentSession", []);
+    let current = await denops.dispatch(denops.name, "getCurrentSession", []);
     assertEquals(current, session2);
 
     // Test session switching
-    await denops.dispatch("claudecode", "setCurrentSession", [session1]);
-    current = await denops.dispatch("claudecode", "getCurrentSession", []);
+    await denops.dispatch(denops.name, "setCurrentSession", [session1]);
+    current = await denops.dispatch(denops.name, "getCurrentSession", []);
     assertEquals(current, session1);
 
     // Test getting all sessions
     const allSessionsResult = await denops.dispatch(
-      "claudecode",
+      denops.name,
       "getAllSessions",
       [],
     );
@@ -104,18 +129,18 @@ test({
     assertExists(allSessions[ensure(session2, is.String)]);
 
     // Clean up
-    await denops.dispatch("claudecode", "endSession", [session1]);
-    await denops.dispatch("claudecode", "endSession", [session2]);
+    await denops.dispatch(denops.name, "endSession", [session1]);
+    await denops.dispatch(denops.name, "endSession", [session2]);
   },
-});
+);
 
-test({
-  mode: "all",
-  name: "Error handling",
-  fn: async (denops) => {
+test(
+  "all",
+  "Error handling",
+  async (denops) => {
     // Test setting non-existent session as current
     try {
-      await denops.dispatch("claudecode", "setCurrentSession", [
+      await denops.dispatch(denops.name, "setCurrentSession", [
         "non-existent-id",
       ]);
       // Should not reach here
@@ -128,7 +153,7 @@ test({
 
     // Test sending message without active session
     try {
-      await denops.dispatch("claudecode", "sendMessage", [
+      await denops.dispatch(denops.name, "sendMessage", [
         "non-existent-id",
         "Hello",
       ]);
@@ -137,14 +162,14 @@ test({
       assertExists(error);
     }
   },
-});
+);
 
 // Test with Vim only
-test({
-  mode: "vim",
-  name: "Vim-specific buffer operations",
-  fn: async (denops) => {
-    const sessionId = await denops.dispatch("claudecode", "startSession", [
+test(
+  "vim",
+  "Vim-specific buffer operations",
+  async (denops) => {
+    const sessionId = await denops.dispatch(denops.name, "startSession", [
       1,
       "sonnet",
     ]);
@@ -154,16 +179,16 @@ test({
     assertEquals(typeof bufname, "string");
 
     // Clean up
-    await denops.dispatch("claudecode", "endSession", [sessionId]);
+    await denops.dispatch(denops.name, "endSession", [sessionId]);
   },
-});
+);
 
 // Test with Neovim only
-test({
-  mode: "nvim",
-  name: "Neovim-specific features",
-  fn: async (denops) => {
-    const sessionId = await denops.dispatch("claudecode", "startSession", [
+test(
+  "nvim",
+  "Neovim-specific features",
+  async (denops) => {
+    const sessionId = await denops.dispatch(denops.name, "startSession", [
       1,
       "sonnet",
     ]);
@@ -173,6 +198,6 @@ test({
     assertEquals(hasNvim, 1);
 
     // Clean up
-    await denops.dispatch("claudecode", "endSession", [sessionId]);
+    await denops.dispatch(denops.name, "endSession", [sessionId]);
   },
-});
+);

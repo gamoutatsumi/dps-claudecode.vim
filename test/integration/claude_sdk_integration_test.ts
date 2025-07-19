@@ -1,31 +1,22 @@
 import { assertEquals, assertExists } from "jsr:@std/assert@^1.0.0";
 import { beforeEach, describe, it } from "jsr:@std/testing@^1.0.0/bdd";
 import { createMockQuery, mockResponses } from "../mocks/claude_sdk.ts";
-
-// Mock Denops interface for testing
-interface MockDenops {
-  calls: Array<{ method: string; args: unknown[] }>;
-
-  call(method: string, ...args: unknown[]): Promise<unknown>;
-  reset(): void;
-}
+import { DenopsStub } from "jsr:@denops/test@^3.0.4";
 
 // Integration test for Claude SDK with denops
 describe("Claude SDK Denops Integration", () => {
-  let denops: MockDenops;
+  let calls: Array<{ fn: string; args: unknown[] }>;
   let mockQuery: ReturnType<typeof createMockQuery>;
+  let denops: DenopsStub;
 
   beforeEach(() => {
-    denops = {
-      calls: [],
-      call: function (method: string, ...args: unknown[]) {
-        this.calls.push({ method, args });
+    calls = [];
+    denops = new DenopsStub({
+      call(fn: string, ...args: unknown[]) {
+        calls.push({ fn, args });
         return Promise.resolve();
       },
-      reset: function () {
-        this.calls = [];
-      },
-    };
+    });
   });
 
   it("should batch buffer updates during streaming", async () => {
@@ -101,16 +92,16 @@ describe("Claude SDK Denops Integration", () => {
     await denops.call("claudecode#buffer#append_lines", bufnr, ["", "---", ""]);
 
     // Verify batching occurred
-    const appendLinesCalls = denops.calls.filter((c) =>
-      c.method === "claudecode#buffer#append_lines"
+    const appendLinesCalls = calls.filter((c) =>
+      c.fn === "claudecode#buffer#append_lines"
     );
     assertExists(appendLinesCalls.length > 0);
 
     // Verify initial setup calls
-    const setupCalls = denops.calls.slice(0, 3);
-    assertEquals(setupCalls[0].method, "claudecode#buffer#append_line");
-    assertEquals(setupCalls[1].method, "claudecode#buffer#append_line");
-    assertEquals(setupCalls[2].method, "claudecode#buffer#replace_last_line");
+    const setupCalls = calls.slice(0, 3);
+    assertEquals(setupCalls[0].fn, "claudecode#buffer#append_line");
+    assertEquals(setupCalls[1].fn, "claudecode#buffer#append_line");
+    assertEquals(setupCalls[2].fn, "claudecode#buffer#replace_last_line");
   });
 
   it("should handle error responses correctly", async () => {
@@ -140,8 +131,8 @@ describe("Claude SDK Denops Integration", () => {
     }
 
     // Verify error handling
-    const errorCall = denops.calls.find((c) =>
-      c.method === "claudecode#buffer#append_line" &&
+    const errorCall = calls.find((c) =>
+      c.fn === "claudecode#buffer#append_line" &&
       c.args[1]?.toString().includes("Error: API rate limit exceeded")
     );
     assertExists(errorCall);
