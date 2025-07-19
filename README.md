@@ -12,23 +12,11 @@ Claude Code integration for Vim/Neovim powered by denops.vim
 
 ## Requirements
 
-- Vim 8.1+ or Neovim 0.4+
+- Vim 9.1.0448+ or Neovim 0.10.0+
 - [denops.vim](https://github.com/vim-denops/denops.vim)
-- Deno runtime
-- Claude Code CLI installed and authenticated
+- Deno runtime 1.45.0+
 
 ## Installation
-
-### Prerequisites
-
-1. Install Claude Code CLI:
-
-```bash
-npm install -g @anthropic-ai/claude-code
-claude login
-```
-
-2. Install denops.vim (if not already installed)
 
 ### Using vim-plug
 
