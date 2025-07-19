@@ -29,7 +29,7 @@ jobs:
           - "2.4.0"
         host_version:
           - vim: "v9.1.0448"
-            nvim: "v0.12.0"
+            nvim: "v0.11.0"
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
