@@ -140,11 +140,6 @@ IDE 連携の仕組みを Denops で実装します。
   // Bad
   const sessionInfo = data as { model: string; bufnr: number; active: boolean };
   ```
-- 複合型（Union型など）にも分かりやすい名前を付けること
-  ```typescript
-  const isSessionInfoOrNull = is.UnionOf([isSessionInfo, is.Null]);
-  const isTextOrTextArray = is.UnionOf([is.String, is.ArrayOf(is.String)]);
-  ```
 
 ## 実装済み機能
 
