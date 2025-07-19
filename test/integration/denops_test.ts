@@ -1,4 +1,3 @@
-import { runtimepath } from "jsr:@denops/std@^7.6.0/option";
 import * as path from "jsr:@std/path@1.0.0";
 import { test as testOri, type TestDefinition } from "jsr:@denops/test@^3.0.4";
 import { assertEquals, assertExists } from "jsr:@std/assert@^1.0.0";
@@ -37,7 +36,6 @@ test(
     await t.step({
       name: "Session API",
       fn: async () => {
-        console.log(await runtimepath.get(denops));
         // Test session creation
         const sessionId = await denops.dispatch(denops.name, "startSession", [
           1,
