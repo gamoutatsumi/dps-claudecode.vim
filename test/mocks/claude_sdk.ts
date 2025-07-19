@@ -41,7 +41,6 @@ export const mockResponses = {
   simpleResponse: [
     {
       type: "system",
-      message: "Starting query processing...",
     },
     {
       type: "assistant",
@@ -59,12 +58,11 @@ export const mockResponses = {
         output_tokens: 8,
       },
     },
-  ],
+  ] as MockMessage[],
 
   codeResponse: [
     {
       type: "system",
-      message: "Processing code request...",
     },
     {
       type: "assistant",
@@ -83,7 +81,7 @@ export const mockResponses = {
         output_tokens: 35,
       },
     },
-  ],
+  ] as MockMessage[],
 
   errorResponse: new Error("API rate limit exceeded"),
 
@@ -104,7 +102,7 @@ export const mockResponses = {
         output_tokens: 0,
       },
     },
-  ],
+  ] as MockMessage[],
 
   multipartResponse: [
     {
@@ -141,7 +139,7 @@ export const mockResponses = {
         output_tokens: 20,
       },
     },
-  ],
+  ] as MockMessage[],
 };
 
 // Mock abort controller for testing cancellation

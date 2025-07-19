@@ -84,6 +84,35 @@ function! claudecode#buffer#append_line(bufnr, text) abort
   endif
 endfunction
 
+" Append multiple lines to the buffer (for performance)
+function! claudecode#buffer#append_lines(bufnr, lines) abort
+  let current_buf = bufnr('%')
+  execute 'buffer' a:bufnr
+
+  " Move to the end of buffer
+  normal! G
+
+  " If we're in a prompt buffer, we need to handle it differently
+  if getbufvar(a:bufnr, '&buftype') == 'prompt'
+    " For prompt buffers, append before the prompt line
+    if has('nvim')
+      call append(line('$') - 1, a:lines)
+    else
+      call append(line('$'), a:lines)
+    endif
+  else
+    call append(line('$'), a:lines)
+  endif
+
+  " Move to the end
+  normal! G
+
+  " Return to original buffer if different
+  if current_buf != a:bufnr
+    execute 'buffer' current_buf
+  endif
+endfunction
+
 " Replace the last line in the buffer
 function! claudecode#buffer#replace_last_line(bufnr, text) abort
   let current_buf = bufnr('%')

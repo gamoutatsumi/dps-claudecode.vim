@@ -12,9 +12,9 @@ Claude Code integration for Vim/Neovim powered by denops.vim
 
 ## Requirements
 
-- Vim 9.1.0448+ or Neovim 0.10.0+
+- Vim 9.1.0448+ or Neovim 0.12.0+
 - [denops.vim](https://github.com/vim-denops/denops.vim)
-- Deno runtime 1.45.0+
+- Deno runtime 2.4.0+
 
 ## Installation
 

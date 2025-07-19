@@ -2,6 +2,8 @@ import { Denops } from "jsr:@denops/std@^7.0.0";
 import { ensure, is } from "jsr:@core/unknownutil@^4.3.0";
 import { query } from "npm:@anthropic-ai/claude-code@^1.0.56";
 
+const FLUSH_INTERVAL = 100; // Flush every 100ms
+
 // Define types based on stream.json format
 interface TextContent {
   type: "text";
@@ -44,16 +46,67 @@ export type Session = {
   bufnr: number;
   messages: AssistantMessage[];
   active: boolean;
+  lastActivity: number;
 };
 
 const sessions = new Map<string, Session>();
 let currentSessionId: string | null = null;
+
+// Memory management constants
+const MAX_SESSIONS = 10;
+const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+
+// Cleanup inactive sessions
+function cleanupInactiveSessions(): void {
+  const now = Date.now();
+  for (const [id, session] of sessions.entries()) {
+    if (!session.active || (now - session.lastActivity > SESSION_TIMEOUT)) {
+      sessions.delete(id);
+      if (currentSessionId === id) {
+        currentSessionId = null;
+      }
+    }
+  }
+}
+
+// Helper function to flush pending lines
+async function flushPendingLines(
+  denops: Denops,
+  pendingLines: string[],
+  session: Session,
+  lastFlushTime: number,
+  force: boolean = false,
+): Promise<number | null> {
+  const now = Date.now();
+  if (
+    pendingLines.length > 0 &&
+    (force || now - lastFlushTime >= FLUSH_INTERVAL)
+  ) {
+    await denops.call(
+      "claudecode#buffer#append_lines",
+      session.bufnr,
+      pendingLines,
+    );
+    return now;
+  }
+  return null;
+}
 
 export function main(denops: Denops): void {
   denops.dispatcher = {
     startSession(bufnr: unknown, model?: unknown): string {
       const bufferNumber = ensure(bufnr, is.Number);
       const modelName = model ? ensure(model, is.String) : "sonnet";
+
+      // Clean up inactive sessions before creating a new one
+      cleanupInactiveSessions();
+
+      // Check if we've reached the maximum number of sessions
+      if (sessions.size >= MAX_SESSIONS) {
+        throw new Error(
+          `Maximum number of sessions (${MAX_SESSIONS}) reached. Please close some sessions before starting a new one.`,
+        );
+      }
 
       const sessionId = crypto.randomUUID();
       const session: Session = {
@@ -62,6 +115,7 @@ export function main(denops: Denops): void {
         bufnr: bufferNumber,
         messages: [],
         active: true,
+        lastActivity: Date.now(),
       };
 
       sessions.set(sessionId, session);
@@ -78,6 +132,9 @@ export function main(denops: Denops): void {
         throw new Error(`Session ${id} not found or inactive`);
       }
 
+      // Update last activity timestamp
+      session.lastActivity = Date.now();
+
       try {
         // Update buffer to show processing
         await denops.call("claudecode#buffer#append_line", session.bufnr, "");
@@ -89,6 +146,8 @@ export function main(denops: Denops): void {
 
         let responseText = "";
         let hasStartedResponse = false;
+        let pendingLines: string[] = [];
+        let lastFlushTime = Date.now();
 
         // Send message to Claude
         for await (
@@ -119,17 +178,24 @@ export function main(denops: Denops): void {
               for (const content of message.message.content) {
                 if (content.type === "text") {
                   responseText += content.text;
-                  // Split by lines and append each line to buffer
+                  // Split by lines and batch them
                   const lines = content.text.split("\n");
                   for (let i = 0; i < lines.length; i++) {
                     // Don't append the last empty line from split
                     if (i < lines.length - 1 || lines[i]) {
-                      await denops.call(
-                        "claudecode#buffer#append_line",
-                        session.bufnr,
-                        lines[i],
-                      );
+                      pendingLines.push(lines[i]);
                     }
+                  }
+                  // Flush periodically
+                  const flushRes = await flushPendingLines(
+                    denops,
+                    pendingLines,
+                    session,
+                    lastFlushTime,
+                  );
+                  if (flushRes !== null) {
+                    lastFlushTime = flushRes;
+                    pendingLines = []; // Clear after flushing
                   }
                 }
               }
@@ -140,29 +206,52 @@ export function main(denops: Denops): void {
               session.messages.push(message.message);
             }
           } else if (message.type === "result") {
+            // Flush any remaining lines before showing usage
+            const flushRes = await flushPendingLines(
+              denops,
+              pendingLines,
+              session,
+              lastFlushTime,
+              true,
+            );
+            if (flushRes !== null) {
+              lastFlushTime = flushRes;
+              pendingLines = []; // Clear after flushing
+            }
+
             // Handle final result with usage statistics if needed
             if (message.usage) {
               await denops.call(
-                "claudecode#buffer#append_line",
+                "claudecode#buffer#append_lines",
                 session.bufnr,
-                "",
-              );
-              await denops.call(
-                "claudecode#buffer#append_line",
-                session.bufnr,
-                `[Tokens used: ${message.usage.input_tokens} input, ${message.usage.output_tokens} output]`,
+                [
+                  "",
+                  `[Tokens used: ${message.usage.input_tokens} input, ${message.usage.output_tokens} output]`,
+                ],
               );
             }
           }
         }
 
-        await denops.call("claudecode#buffer#append_line", session.bufnr, "");
-        await denops.call(
-          "claudecode#buffer#append_line",
-          session.bufnr,
-          "---",
+        // Flush any remaining lines
+        const flushRes = await flushPendingLines(
+          denops,
+          pendingLines,
+          session,
+          lastFlushTime,
+          true,
         );
-        await denops.call("claudecode#buffer#append_line", session.bufnr, "");
+        if (flushRes !== null) {
+          lastFlushTime = flushRes;
+          pendingLines = []; // Clear after flushing
+        }
+
+        // Add separator
+        await denops.call(
+          "claudecode#buffer#append_lines",
+          session.bufnr,
+          ["", "---", ""],
+        );
       } catch (error) {
         await denops.call(
           "claudecode#buffer#replace_last_line",
@@ -218,6 +307,9 @@ export function main(denops: Denops): void {
         throw new Error(`Session ${id} is inactive`);
       }
 
+      // Update last activity timestamp
+      session.lastActivity = Date.now();
+
       currentSessionId = id;
     },
 
@@ -242,6 +334,9 @@ export function main(denops: Denops): void {
       if (!session || !session.active) {
         throw new Error(`Session ${id} not found or inactive`);
       }
+
+      // Update last activity timestamp
+      session.lastActivity = Date.now();
 
       session.model = modelName;
       await denops.call(
