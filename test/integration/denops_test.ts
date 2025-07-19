@@ -2,6 +2,7 @@ import * as path from "jsr:@std/path@1.0.0";
 import { test as testOri, type TestDefinition } from "jsr:@denops/test@^3.0.4";
 import { assertEquals, assertExists } from "jsr:@std/assert@^1.0.0";
 import { ensure, is } from "jsr:@core/unknownutil@^4.3.0";
+import { main } from "../../denops/claudecode/main.ts";
 
 // Define type predicates for better readability
 const isSessionInfo = is.ObjectOf({
@@ -24,71 +25,73 @@ const test = (
   testOri({
     mode,
     name,
-    fn,
     pluginName: "claudecode",
-    prelude: [`set runtimepath^=${runtimePath}`],
+    prelude: [
+      `set runtimepath^=${runtimePath}`,
+    ],
+    fn: (denops, t) => {
+      main(denops);
+      fn(denops, t);
+    },
   });
 
 test(
   "all",
   "Denops dispatcher functions",
-  async (denops, t) => {
-    await t.step({
-      name: "Session API",
-      fn: async () => {
-        // Test session creation
-        const sessionId = await denops.dispatch(denops.name, "startSession", [
-          1,
-          "sonnet",
-        ]);
-        assertExists(sessionId);
-        assertEquals(typeof sessionId, "string");
+  async (denops) => {
+    // Test session creation
+    const sessionId = await denops.dispatch(
+      denops.name,
+      "startSession",
+      1,
+      "sonnet",
+    );
+    assertExists(sessionId);
+    assertEquals(typeof sessionId, "string");
 
-        // Test getting session info
-        const info = await denops.dispatch(denops.name, "getSessionInfo", [
-          sessionId,
-        ]);
-        const sessionInfo = ensure(info, isSessionInfoOrNull);
-        assertExists(sessionInfo);
-        assertEquals(sessionInfo.model, "sonnet");
-        assertEquals(sessionInfo.bufnr, 1);
-        assertEquals(sessionInfo.active, true);
+    // Test getting session info
+    const info = await denops.dispatch(denops.name, "getSessionInfo", [
+      sessionId,
+    ]);
+    const sessionInfo = ensure(info, isSessionInfoOrNull);
+    assertExists(sessionInfo);
+    assertEquals(sessionInfo.model, "sonnet");
+    assertEquals(sessionInfo.bufnr, 1);
+    assertEquals(sessionInfo.active, true);
 
-        // Test getting current session
-        const currentSession = await denops.dispatch(
-          denops.name,
-          "getCurrentSession",
-          [],
-        );
-        assertEquals(currentSession, sessionId);
+    // Test getting current session
+    const currentSession = await denops.dispatch(
+      denops.name,
+      "getCurrentSession",
+      [],
+    );
+    assertEquals(currentSession, sessionId);
 
-        // Test listing sessions
-        const sessionsResult = await denops.dispatch(
-          denops.name,
-          "listSessions",
-          [],
-        );
-        const sessions = ensure(sessionsResult, is.ArrayOf(is.String));
-        assertEquals(Array.isArray(sessions), true);
-        assertEquals(sessions.includes(ensure(sessionId, is.String)), true);
+    // Test listing sessions
+    const sessionsResult = await denops.dispatch(
+      denops.name,
+      "listSessions",
+      [],
+    );
+    const sessions = ensure(sessionsResult, is.ArrayOf(is.String));
+    assertEquals(Array.isArray(sessions), true);
+    assertEquals(sessions.includes(ensure(sessionId, is.String)), true);
 
-        // Test ending session
-        await denops.dispatch(denops.name, "endSession", [sessionId]);
+    // Test ending session
+    await denops.dispatch(denops.name, "endSession", [sessionId]);
 
-        // Verify session is ended
-        const endedInfo = await denops.dispatch(denops.name, "getSessionInfo", [
-          sessionId,
-        ]);
-        assertEquals(endedInfo, null);
+    // Verify session is ended
+    const endedInfo = await denops.dispatch(denops.name, "getSessionInfo", [
+      sessionId,
+    ]);
+    assertEquals(endedInfo, null);
 
-        const endedCurrent = await denops.dispatch(
-          denops.name,
-          "getCurrentSession",
-          [],
-        );
-        assertEquals(endedCurrent, null);
-      },
-    });
+    const endedCurrent = await denops.dispatch(
+      denops.name,
+      "getCurrentSession",
+      [],
+    );
+    assertEquals(endedCurrent, null);
   },
 );
 
